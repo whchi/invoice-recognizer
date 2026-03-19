@@ -1,0 +1,31 @@
+#:schema node_modules/wrangler/config-schema.json
+name = "invoice-recognizer"
+main = "worker.ts"
+compatibility_date = "2026-02-23"
+compatibility_flags = ["nodejs_compat"]
+
+[[d1_databases]]
+binding = "DB"
+database_name = "invoice-recognizer"
+database_id = "cb376c17-cb1c-4673-9ed1-f4826e3ab668"
+
+[[r2_buckets]]
+binding = "R2_BUCKET"
+bucket_name = "priv"
+
+[[kv_namespaces]]
+binding = "RATE_LIMIT"
+id = "5cb5b13d061d4918ba9a9006c259fdde"
+
+[[queues.producers]]
+queue = "invoice-recognizer-tasks"
+binding = "TASK_QUEUE"
+
+[[queues.consumers]]
+queue = "invoice-recognizer-tasks"
+max_retries = 3
+
+[assets]
+directory = "dist/client"
+not_found_handling = "single-page-application"
+run_worker_first = ["/api/*", "/docs", "/openapi.json"]
