@@ -3,8 +3,9 @@ import { createTask, getTask } from '@backend/lib/tasks';
 import { authenticateRequest } from '@backend/middleware/auth';
 import type { Bindings, Variables } from '@backend/types';
 import { Hono } from 'hono';
-import { describeRoute, resolver } from 'hono-openapi';
 import { HTTPException } from 'hono/http-exception';
+import { describeRoute, resolver } from 'hono-openapi';
+import { exportRouter } from './export';
 import { TaskResponseSchema, TasksErrorSchema } from './schema';
 
 export const tasks = new Hono<{ Bindings: Bindings; Variables: Variables }>();
@@ -162,3 +163,6 @@ tasks.get(
     );
   },
 );
+
+// Register export routes
+tasks.route('/', exportRouter);
