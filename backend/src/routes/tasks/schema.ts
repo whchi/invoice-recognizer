@@ -31,3 +31,18 @@ export const TasksErrorSchema = z
     error: z.string().openapi({ example: 'unauthorized' }),
   })
   .openapi({ ref: 'TasksError' });
+
+export const ExportFormatSchema = z.enum(['json', 'csv', 'xml']).openapi({ ref: 'ExportFormat', example: 'json' });
+
+export const ExportQuerySchema = z
+  .object({
+    format: ExportFormatSchema.optional().default('json'),
+  })
+  .openapi({ ref: 'ExportQuery' });
+
+export const ExportResponseSchema = z
+  .union([
+    z.string().openapi({ description: 'Exported data' }),
+    z.object({ error: z.string() }).openapi({ description: 'Error response' }),
+  ])
+  .openapi({ ref: 'ExportResponse' });
