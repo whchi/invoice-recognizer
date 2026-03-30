@@ -1,11 +1,10 @@
-import { taskResults, tasks } from '@backend/db/schema';
 import { exportToCsv, exportToJson, exportToXml } from '@backend/lib/export';
+import { getTask } from '@backend/lib/tasks';
 import { authenticateRequest } from '@backend/middleware/auth';
 import type { Bindings, Variables } from '@backend/types';
-import { eq } from 'drizzle-orm';
 import { Hono } from 'hono';
 import { describeRoute, resolver } from 'hono-openapi';
-import { ExportQuerySchema, ExportResponseSchema } from './schema';
+import { ExportResponseSchema } from './schema';
 
 export const exportRouter = new Hono<{ Bindings: Bindings; Variables: Variables }>();
 
@@ -47,46 +46,32 @@ exportRouter.get(
       return c.json({ error: 'invalid_format' }, 400);
     }
 
-    // Fetch task with authorization check
-    const [task] = await db
-      .select({
-        id: tasks.id,
-        userId: tasks.userId,
-        status: tasks.status,
-      })
-      .from(tasks)
-      .where(eq(tasks.id, taskId))
-      .limit(1);
+    // Fetch task using getTask (enables mocking in tests)
+    const taskResult = await getTask(taskId, userId, db);
 
-    if (!task) {
-      return c.json({ error: 'not_found' }, 404);
-    }
-
-    // Authorization: task owner or guest task
-    if (task.userId !== null && task.userId !== userId) {
+    if (!taskResult.ok) {
+      if (taskResult.error === 'not_found') {
+        return c.json({ error: 'not_found' }, 404);
+      }
       return c.json({ error: 'forbidden' }, 403);
     }
+
+    const task = taskResult.task;
 
     // Only allow export of completed tasks
     if (task.status !== 'completed') {
       return c.json({ error: 'task_not_completed' }, 400);
     }
 
-    // Fetch result
-    const [resultRow] = await db
-      .select({ result: taskResults.result })
-      .from(taskResults)
-      .where(eq(taskResults.taskId, taskId))
-      .limit(1);
-
-    if (!resultRow) {
+    // Check if result exists
+    if (!task.result) {
       return c.json({ error: 'result_not_found' }, 404);
     }
 
     // Parse and export based on format
     let parsedResult: Record<string, unknown>;
     try {
-      parsedResult = JSON.parse(resultRow.result);
+      parsedResult = JSON.parse(task.result);
     } catch {
       return c.json({ error: 'invalid_result_data' }, 500);
     }
