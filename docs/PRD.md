@@ -1,53 +1,67 @@
 # PRD: AI 智能發票解析中樞 (MVP Phase)
 
-## 1. 產品概述 (Product Overview)
-本產品為一款結合 OCR 與 LLM 技術的發票解析 SaaS 服務。旨在協助財務人員與開發者快速萃取發票資訊，並透過自訂 Template 輸出符合其系統需求的 JSON 或 CSV 格式。MVP 階段的商業模式採用 Credit-based (固定點數包) 買斷制。
+## 1. 產品定位 (Product Positioning)
 
-## 2. 核心原則與範圍 (Core Principles & Out of Scope)
-* **API First**：所有前端 UI 的操作，底層皆需有對應的 API 支撐，確保開發者體驗 (Developer Experience, DX)。
-* **防禦性法務設計**：系統層面**不開發** PII (個人可識別資訊) 遮罩或資料加密隔離機制。作為替代，MVP 必須強迫使用者同意免責聲明，並在技術上保證發票處理完畢後立即銷毀暫存檔 (Zero Data Retention)。
-* **Out of Scope (MVP 不做)**：自動儲值 (Auto-top-up)、複雜的多人協作 (RBAC 權限管理)、地端部署版本 (On-premise)。
+**定位：** 專為台灣市場設計的發票解析 API，专解決「二聯式/三聯式發票」和「電子發票」欄位雜亂、OCR 辨識率低的問題。
+
+**目標用戶：**
+- ERP 系統商 / API 整合開發者 — 需要把發票資料轉入客戶的會計系統
+- 記帳士 / 會計師事務所 — 處理大量發票資料，需要快速萃取
+
+**為什麼不能直接用 OpenAI Vision API：**
+- 發票格式固定，通用 Vision API 容易填錯欄位（例如把「銷售額」填到「稅額」）
+- 需要輸出符合台灣發票法規定義的標準欄位名稱，不是自由文字
+- 需要結構化 JSON，不是自由文字描述
+
+**為什麼現在：**
+- 電子發票滲透率持續上升，但多數系統仍靠人工 Key-in
+- 沒有針對台灣發票格式優化的解析 API
+- 這個問題足夠痛，工程難度足夠高，競爭足夠少
 
 ---
 
-## 3. 功能規格與優先級 (Feature Prioritization)
+## 2. 功能規格與優先級 (Feature Prioritization)
 採用 **MoSCoW 方法** 將功能分為 P0 (Must-have)、P1 (Should-have) 與 P2 (Nice-to-have)。
 
-### P0：MVP 核心必備 (上線的最低標準)
-* **F-01: 使用者身份與額度系統 (Auth & Quota Engine)**
-    * **訪客模式**：透過 IP 或 Session 追蹤，提供免登入 3 張/day 試用額度。
-    * **註冊登入**：提供 Email/Password 與 Google OAuth 登入。
-    * **註冊會員額度**：登入後自動重置為每日免費 20 張/day。
-    * **點數錢包 (Credit Wallet)**：支援匯入「固定點數包」的額度，並在每次 API 成功回傳後扣除 1 點。
-* **F-02: 核心解析管線 (Core Parsing Pipeline)**
-    * **上傳模組**：支援拖曳上傳單張影像 (JPG/PNG) 或 PDF。
-    * **合規免責 Checkbox**：上傳前必須勾選「同意影像傳送至第三方 AI，且本平台不負資料外洩責任」之聲明，未勾選無法調用 API。
-    * **AI 處理引擎**：串接 OCR 前處理與 LLM 進行資訊萃取。
-    * **Zero Data Retention 機制**：任務完成或失敗後，系統需自動刪除伺服器上的影像檔案。
-* **F-03: 模板管理系統 (Template Management)**
-    * **預設模板**：系統內建 1-2 款符合常見會計法規的標準 JSON Schema。
-    * **自訂模板 (Custom Template)**：允許使用者輸入「模板名稱」與「期望的 JSON 格式/欄位」。
-    * **我的最愛 (Favorites)**：可將特定模板標記為預設或最愛，以便下次快速套用。
-* **F-04: 開發者中心 (Developer Center)**
-    * **API Key 管理**：生成、停用與重新產生 API Key。
-    * **API 文件與 SDK Snippet**：提供清晰的 API Endpoint 說明，以及至少兩種語言 (如 Python, Node.js) 的複製貼上範例程式碼。
+### P0：MVP 核心 (上線最低標準)
+* **F-01: 發票解析 API**
+    * 支援二聯式發票（含手開發票）、三聯式發票、電子發票（XML/ZATCA 格式）
+    * 輸出標準化 JSON，欄位對應台灣財政部發票格式定義
+    * 附帶解析信心度分數（confidence score），讓整合方自行決定是否需要人工覆核
+* **F-02: 開發者身份系統**
+    * Email/Password 註冊登入 + Google OAuth
+    * API Key 管理（生成、停用、重新產生）
+    * Credit 錢包：購買點數包後按次扣費，不成功不扣點
+* **F-03: 解析結果取得**
+    * Task ID + Polling 機制（避免 LLM 延遲 timeout）
+    * Webhook 回調（可選，給需要即時回應的整合方）
+* **F-04: Zero Data Retention**
+    * 發票圖片處理完畢後立即刪除，不做任何暫存
 
-### P1：重要次級功能 (優化體驗與變現)
-* **F-05: 匯出與下載 (Export Module)**
-    * 提供單筆或多筆解析結果的 JSON 與 CSV 格式一鍵下載功能。
-* **F-06: 用量儀表板 (Usage Dashboard)**
-    * 視覺化顯示當前剩餘的 Credit 點數，以及近 30 天的 API 呼叫次數折線圖。
-* **F-07: 基礎金流串接 (Payment Gateway Integration)**
-    * 串接 Stripe 或 TapPay，允許使用者在線上直接刷卡購買「10 萬次點數包」，付款成功後自動入帳至 Credit Wallet。
+### P1：變現與體驗優化
+* **F-05: 前台上傳 UI**
+    * 拖曳上傳介面，供不透過 API 的使用者直接測試
+    * 每張發票解析結果可一鍵下載 JSON
+* **F-06: 用量儀表板**
+    * 顯示剩餘點數、API 呼叫歷史
+* **F-07: 金流串接**
+    * 串接 Stripe 或 TapPay，購買「萬次點數包」（固定數量，無自動續扣）
 
-### P2：未來擴充 (MVP 後的迭代目標)
-* **F-08: 批次處理與對照 UI (Batch & Human-in-the-loop)**
-    * 支援一次上傳 50 張發票，並提供左右對照的 UI 介面，讓財務人員可以在下載前手動修正 LLM 的幻覺或 OCR 辨識錯誤。
-* **F-09: 低餘額警示 (Low-Balance Alerts)**
-    * 點數低於 10% 時，自動發送 Email 提醒購買。
+### P2：未來迭代
+* **F-08: 批次上傳 + 人工覆核介面**
+* **F-09: 低餘額 Email 提醒**
+
+---
+
+## 3. 明確不做 (Out of Scope)
+* **自訂模板功能**：MVP 輸出固定為財政部標準欄位，不開放使用者自定義 JSON Schema。這個功能讓產品複雜度大增，但付費動機不足（整合方通常只需要標準格式）。
+* **多人協作 / RBAC**
+* **自動儲值**
+* **PII 遮罩或加密儲存**（發票不含健保卡等高敏感個資，Zero Data Retention 已是合理防護）
 
 ---
 
 ## 4. 系統架構要求 (Architecture Requirements)
-* **異步處理 (Asynchronous Processing)**：由於 LLM 回應時間不穩定（可能耗時 5-15 秒），API 設計不可採用單純的同步 (Synchronous) 回應。建議實作 Webhook 機制，或給予使用者一個 `Task ID` 進行 polling (輪詢)，以避免 Timeout。
-* **嚴格的 Schema Validation**：在 LLM 將結果回傳給使用者之前，後端必須實作校驗層，確保回傳的 JSON 結構 100% 符合使用者定義的 Template，避免因 LLM 幻覺導致客戶端系統崩潰。
+* **異步處理**：LLM 回應可能達 5-15 秒，API 必須回傳 Task ID 由用戶端輪詢，或支援 Webhook 回調。同步等待會 timeout。
+* **Schema Validation**：LLM 回傳後必須校驗 JSON 欄位（欄位名稱、數字範圍、稅額公式）符合財政部格式，不合格者標記為「需要人工覆核」而非直接回傳。
+* **不暫存發票圖片**：圖片上傳後進入 Queue，處理完成即刪除。不进 R2/D1。

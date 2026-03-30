@@ -1,10 +1,6 @@
-import { createId } from '@paralleldrive/cuid2';
-import bcrypt from 'bcryptjs';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { reset, seed } from 'drizzle-seed';
-import * as schema from '../src/db/schema';
-
-const ADMIN_PASSWORD_HASH = bcrypt.hashSync('Aa1234', 10);
+import * as schema from '../backend/src/db/schema';
 
 const SEED_COUNT = {
   apiKeysPerUser: 1,
@@ -86,54 +82,16 @@ async function main() {
     verification: { count: 0 },
   }));
 
-  // Insert admin user with fixed credentials
-  console.log('Creating admin user...');
-  const adminId = createId();
-  const accountId = createId();
-  await db
-    .insert(schema.user)
-    .values({
-      createdAt: new Date(),
-      email: 'admin@cc.cc',
-      id: adminId,
-      name: 'Admin User',
-      updatedAt: new Date(),
-    })
-    .onConflictDoNothing();
-
-  // Create credential account for admin (better-auth stores password in account table)
-  await db
-    .insert(schema.account)
-    .values({
-      accountId: 'admin@cc.cc',
-      createdAt: new Date(),
-      id: accountId,
-      password: ADMIN_PASSWORD_HASH,
-      providerId: 'credential',
-      updatedAt: new Date(),
-      userId: adminId,
-    })
-    .onConflictDoNothing();
-
-  await db
-    .insert(schema.creditWallet)
-    .values({
-      balance: 1000,
-      updatedAt: new Date(),
-      userId: adminId,
-    })
-    .onConflictDoNothing();
-
   console.log('Seed complete.');
-  console.log(`  Users:      ${SEED_COUNT.users} + 1 admin`);
+  console.log(`  Users:      ${SEED_COUNT.users}`);
   console.log(`  Templates:  ${SEED_COUNT.templates}`);
   console.log(`  Tasks:      ${SEED_COUNT.tasks}`);
   console.log(`  API Keys:   ${SEED_COUNT.users * SEED_COUNT.apiKeysPerUser}`);
-  console.log(`  Wallets:    ${SEED_COUNT.users} + 1 admin`);
+  console.log(`  Wallets:    ${SEED_COUNT.users}`);
   console.log('');
-  console.log('Admin credentials:');
-  console.log('  Email:    admin@cc.cc');
-  console.log('  Password: Aa1234');
+  console.log('NOTE: Admin user must be created via sign-up API.');
+  console.log('      POST /api/auth/sign-up/email with:');
+  console.log("        { email: 'admin@cc.cc', password: 'Aa123456', name: 'Admin User' }");
 }
 
 main().catch(err => {

@@ -48,3 +48,6 @@ test-results
 .tanstack
 *.sqlite
 .serena
+.agents
+06jcOg8Bw1Gckg-TGf2cp
+node-compile-cache
