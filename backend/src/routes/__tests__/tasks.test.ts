@@ -429,3 +429,45 @@ describe('GET /api/tasks/:id', () => {
     expect(mockGetTask).toHaveBeenCalledWith('task-guest', null, undefined);
   });
 });
+
+describe('GET /api/tasks/:id/export', () => {
+  it('returns 400 for task not completed', async () => {
+    const tasksRoute = await importTasks();
+    const app = createTestApp(tasksRoute);
+
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-123' });
+    mockGetTask.mockResolvedValue({
+      ok: true,
+      task: {
+        id: 'task-123',
+        status: 'processing',
+        createdAt: new Date(),
+      },
+    });
+
+    const res = await app.request('/api/tasks/task-123/export?format=json', { method: 'GET' }, mockEnv);
+    expect(res.status).toBe(400);
+
+    const body = (await res.json()) as { error: string };
+    expect(body.error).toBe('task_not_completed');
+  });
+
+  it('returns 400 for invalid format', async () => {
+    const tasksRoute = await importTasks();
+    const app = createTestApp(tasksRoute);
+
+    mockAuthenticateRequest.mockResolvedValue({ userId: 'user-123' });
+    mockGetTask.mockResolvedValue({
+      ok: true,
+      task: {
+        id: 'task-123',
+        status: 'completed',
+        result: '{"invoice_number":"AB-12345678"}',
+        createdAt: new Date(),
+      },
+    });
+
+    const res = await app.request('/api/tasks/task-123/export?format=yaml', { method: 'GET' }, mockEnv);
+    expect(res.status).toBe(400);
+  });
+});
