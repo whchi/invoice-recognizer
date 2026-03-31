@@ -1,5 +1,8 @@
+import * as bcrypt from 'bcryptjs';
+import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/better-sqlite3';
 import { reset, seed } from 'drizzle-seed';
+import { ulid } from 'ulid';
 import * as schema from '../backend/src/db/schema';
 
 const SEED_COUNT = {
@@ -7,6 +10,12 @@ const SEED_COUNT = {
   tasks: 20,
   templates: 5,
   users: 3,
+};
+
+const ADMIN_USER = {
+  email: 'admin@cc.cc',
+  password: 'Aa1234',
+  name: 'Admin User',
 };
 
 const TEMPLATE_FIELDS = [
@@ -18,6 +27,56 @@ const TEMPLATE_FIELDS = [
 ];
 
 const TEMPLATE_NAMES = ['Standard Invoice', 'Retail Receipt', 'Purchase Order', 'Expense Report', 'Utility Bill'];
+
+async function createAdminUser(db: ReturnType<typeof drizzle>) {
+  console.log('Creating admin user...');
+
+  const existingUser = await db
+    .select({ id: schema.user.id })
+    .from(schema.user)
+    .where(eq(schema.user.email, ADMIN_USER.email))
+    .limit(1);
+
+  if (existingUser.length > 0) {
+    console.log('Admin user already exists, skipping...');
+    return;
+  }
+
+  const userId = ulid();
+  const accountId = ulid();
+  const now = new Date();
+  const passwordHash = await bcrypt.hash(ADMIN_USER.password, 10);
+
+  await db.insert(schema.user).values({
+    id: userId,
+    name: ADMIN_USER.name,
+    email: ADMIN_USER.email,
+    emailVerified: false,
+    image: null,
+    createdAt: now,
+    updatedAt: now,
+  } as any);
+
+  await db.insert(schema.account).values({
+    id: accountId,
+    accountId: userId,
+    providerId: 'credentials',
+    userId: userId,
+    password: passwordHash,
+    createdAt: now,
+    updatedAt: now,
+  } as any);
+
+  await db.insert(schema.creditWallet).values({
+    userId: userId,
+    balance: 1000,
+    updatedAt: new Date(),
+  });
+
+  console.log('Admin user created successfully!');
+  console.log(`  Email:    ${ADMIN_USER.email}`);
+  console.log(`  Password: ${ADMIN_USER.password}`);
+}
 
 async function main() {
   const db = drizzle('dev.sqlite');
@@ -82,16 +141,18 @@ async function main() {
     verification: { count: 0 },
   }));
 
+  await createAdminUser(db);
+
   console.log('Seed complete.');
-  console.log(`  Users:      ${SEED_COUNT.users}`);
+  console.log(`  Users:      ${SEED_COUNT.users + 1} (including admin)`);
   console.log(`  Templates:  ${SEED_COUNT.templates}`);
   console.log(`  Tasks:      ${SEED_COUNT.tasks}`);
   console.log(`  API Keys:   ${SEED_COUNT.users * SEED_COUNT.apiKeysPerUser}`);
-  console.log(`  Wallets:    ${SEED_COUNT.users}`);
+  console.log(`  Wallets:    ${SEED_COUNT.users + 1} (including admin)`);
   console.log('');
-  console.log('NOTE: Admin user must be created via sign-up API.');
-  console.log('      POST /api/auth/sign-up/email with:');
-  console.log("        { email: 'admin@cc.cc', password: 'Aa123456', name: 'Admin User' }");
+  console.log('Admin account:');
+  console.log(`  Email:    ${ADMIN_USER.email}`);
+  console.log(`  Password: ${ADMIN_USER.password}`);
 }
 
 main().catch(err => {
